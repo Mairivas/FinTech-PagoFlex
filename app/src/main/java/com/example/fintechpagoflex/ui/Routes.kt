@@ -46,3 +46,6 @@ data class ReminderSetupRoute(val id: Long)
 
 @Serializable
 data object RemindersRoute
+
+@Serializable
+data object ProfileRoute

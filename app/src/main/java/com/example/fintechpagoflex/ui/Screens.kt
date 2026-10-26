@@ -20,12 +20,14 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import com.example.fintechpagoflex.ui.theme.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -36,11 +38,14 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -51,6 +56,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.fintechpagoflex.NotificationReceiver
 import com.example.fintechpagoflex.data.AppDatabase
+import com.example.fintechpagoflex.data.ProfilePreferences
 import java.io.File
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
@@ -64,15 +70,19 @@ import java.util.Locale
 fun HomeScreen(
     onNavigateToDetail: (Long) -> Unit,
     onNavigateToReminders: () -> Unit,
+    onNavigateToProfile: () -> Unit = {},
     onNavigateToReminderSetup: (Long) -> Unit = {}
 ) {
     val context = LocalContext.current
     val dao = AppDatabase.getDatabase(context).appDao()
-    val viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory(dao))
+    val prefs = remember { ProfilePreferences.getInstance(context) }
+    val viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory(dao, prefs))
 
     val commitments by viewModel.commitments.collectAsState()
     val totalPending by viewModel.totalPending.collectAsState()
     val nextDueDate by viewModel.nextDueDate.collectAsState()
+    val profileName by viewModel.profileName.collectAsState()
+    val profilePhotoUri by viewModel.profilePhotoUri.collectAsState()
 
     Scaffold(
         topBar = {
@@ -94,11 +104,45 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
-                Text(
-                    text = "Hola, Juan Pérez",
-                    style = MaterialTheme.typography.headlineMedium,
-                    modifier = Modifier.padding(top = 16.dp)
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Hola, $profileName",
+                        style = MaterialTheme.typography.headlineMedium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer)
+                            .clickable { onNavigateToProfile() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (!profilePhotoUri.isNullOrBlank()) {
+                            AsyncImage(
+                                model = profilePhotoUri,
+                                contentDescription = "Foto de perfil",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(CircleShape)
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = "Foto de perfil",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                    }
+                }
             }
             item {
                 Card(
@@ -443,7 +487,8 @@ fun CommitmentDetailScreen(
 ) {
     val context = LocalContext.current
     val dao = AppDatabase.getDatabase(context).appDao()
-    val viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory(dao))
+    val prefs = remember { ProfilePreferences.getInstance(context) }
+    val viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory(dao, prefs))
 
     val commitment by viewModel.getCommitment(id).collectAsState()
     var photoUriState by remember { mutableStateOf<Uri?>(null) }
@@ -1248,4 +1293,150 @@ fun formatDate(timeInMillis: Long): String {
 fun formatDateTime(timeInMillis: Long): String {
     val formatter = SimpleDateFormat("dd MMM yyyy HH:mm", Locale.forLanguageTag("es-CL"))
     return formatter.format(Date(timeInMillis))
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ProfileScreen(
+    onNavigateBack: () -> Unit
+) {
+    val context = LocalContext.current
+    val prefs = remember { ProfilePreferences.getInstance(context) }
+    val viewModel: ProfileViewModel = viewModel(factory = ProfileViewModel.Factory(prefs))
+    val uiState by viewModel.uiState.collectAsState()
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    var tempPhotoUri by remember { mutableStateOf<Uri?>(null) }
+
+    val takePictureLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success && tempPhotoUri != null) {
+            viewModel.onPhotoUpdated(tempPhotoUri.toString())
+        }
+    }
+
+    LaunchedEffect(uiState.showSuccessSnackbar) {
+        if (uiState.showSuccessSnackbar) {
+            snackbarHostState.showSnackbar("Perfil guardado con éxito")
+            viewModel.dismissSnackbar()
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Mi Perfil") },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Volver"
+                        )
+                    }
+                }
+            )
+        },
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(120.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!uiState.photoUriString.isNullOrBlank()) {
+                    AsyncImage(
+                        model = uiState.photoUriString,
+                        contentDescription = "Foto de perfil",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = "Sin foto de perfil",
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(64.dp)
+                    )
+                }
+            }
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    onClick = {
+                        val profileDir = File(context.filesDir, "profile").apply {
+                            if (!exists()) mkdirs()
+                        }
+                        val photoFile = File(profileDir, "profile_photo_${System.currentTimeMillis()}.jpg")
+                        val uri = FileProvider.getUriForFile(
+                            context,
+                            "${context.packageName}.fileprovider",
+                            photoFile
+                        )
+                        tempPhotoUri = uri
+                        takePictureLauncher.launch(uri)
+                    }
+                ) {
+                    Text("Tomar foto de perfil")
+                }
+
+                if (!uiState.photoUriString.isNullOrBlank()) {
+                    OutlinedButton(
+                        onClick = { viewModel.removePhoto() }
+                    ) {
+                        Text("Quitar foto")
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            OutlinedTextField(
+                value = uiState.name,
+                onValueChange = { viewModel.onNameChanged(it) },
+                label = { Text("Nombre") },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = null
+                    )
+                },
+                isError = uiState.nameError != null,
+                supportingText = {
+                    AnimatedVisibility(visible = uiState.nameError != null) {
+                        uiState.nameError?.let { errorMsg ->
+                            Text(
+                                text = errorMsg,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            Button(
+                onClick = { viewModel.saveProfile() },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Guardar")
+            }
+        }
+    }
 }

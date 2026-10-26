@@ -6,18 +6,27 @@ import androidx.lifecycle.viewModelScope
 import com.example.fintechpagoflex.data.AppDao
 import com.example.fintechpagoflex.data.Commitment
 import com.example.fintechpagoflex.data.PaymentHistoryItem
+import com.example.fintechpagoflex.data.ProfilePreferences
 import com.example.fintechpagoflex.util.validatePaymentForm
+import com.example.fintechpagoflex.util.validateProfileForm
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class HomeViewModel(private val dao: AppDao) : ViewModel() {
+class HomeViewModel(
+    private val dao: AppDao,
+    private val profilePreferences: ProfilePreferences
+) : ViewModel() {
+
+    val profileName: StateFlow<String> = profilePreferences.name
+    val profilePhotoUri: StateFlow<String?> = profilePreferences.photoUri
+
     val commitments: StateFlow<List<Commitment>> = dao.getAllCommitments()
         .map { list ->
             list.sortedWith(
@@ -64,11 +73,14 @@ class HomeViewModel(private val dao: AppDao) : ViewModel() {
         }
     }
 
-    class Factory(private val dao: AppDao) : ViewModelProvider.Factory {
+    class Factory(
+        private val dao: AppDao,
+        private val profilePreferences: ProfilePreferences
+    ) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(HomeViewModel::class.java)) {
                 @Suppress("UNCHECKED_CAST")
-                return HomeViewModel(dao) as T
+                return HomeViewModel(dao, profilePreferences) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class")
         }
@@ -166,6 +178,78 @@ class SimulatePaymentViewModel(private val dao: AppDao) : ViewModel() {
             if (modelClass.isAssignableFrom(SimulatePaymentViewModel::class.java)) {
                 @Suppress("UNCHECKED_CAST")
                 return SimulatePaymentViewModel(dao) as T
+            }
+            throw IllegalArgumentException("Unknown ViewModel class")
+        }
+    }
+}
+
+data class ProfileUiState(
+    val name: String = "Juan Pérez",
+    val photoUriString: String? = null,
+    val nameError: String? = null,
+    val showSuccessSnackbar: Boolean = false
+)
+
+class ProfileViewModel(private val prefs: ProfilePreferences) : ViewModel() {
+    private val _uiState = MutableStateFlow(
+        ProfileUiState(
+            name = prefs.getName(),
+            photoUriString = prefs.getPhotoUri()
+        )
+    )
+    val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
+
+    fun onNameChanged(newName: String) {
+        _uiState.update { current ->
+            current.copy(
+                name = newName,
+                nameError = if (current.nameError != null) validateProfileForm(newName) else null,
+                showSuccessSnackbar = false
+            )
+        }
+    }
+
+    fun onPhotoUpdated(uriString: String?) {
+        prefs.savePhotoUri(uriString)
+        _uiState.update { current ->
+            current.copy(
+                photoUriString = uriString,
+                showSuccessSnackbar = false
+            )
+        }
+    }
+
+    fun removePhoto() {
+        prefs.savePhotoUri(null)
+        _uiState.update { current ->
+            current.copy(
+                photoUriString = null,
+                showSuccessSnackbar = false
+            )
+        }
+    }
+
+    fun saveProfile() {
+        val currentName = _uiState.value.name
+        val error = validateProfileForm(currentName)
+        if (error != null) {
+            _uiState.update { it.copy(nameError = error, showSuccessSnackbar = false) }
+        } else {
+            prefs.saveName(currentName)
+            _uiState.update { it.copy(nameError = null, showSuccessSnackbar = true) }
+        }
+    }
+
+    fun dismissSnackbar() {
+        _uiState.update { it.copy(showSuccessSnackbar = false) }
+    }
+
+    class Factory(private val prefs: ProfilePreferences) : ViewModelProvider.Factory {
+        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            if (modelClass.isAssignableFrom(ProfileViewModel::class.java)) {
+                @Suppress("UNCHECKED_CAST")
+                return ProfileViewModel(prefs) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class")
         }

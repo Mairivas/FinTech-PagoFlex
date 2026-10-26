@@ -65,3 +65,13 @@ fun validateRecommendForm(orgName: String, orgType: String): RecommendValidation
         isValid = isOrgNameValid && isOrgTypeValid
     )
 }
+
+fun validateProfileForm(name: String): String? {
+    if (name.isBlank()) {
+        return "El nombre no puede estar vacío."
+    }
+    if (name.length > 40) {
+        return "El nombre no puede superar los 40 caracteres."
+    }
+    return null
+}

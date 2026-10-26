@@ -28,6 +28,8 @@ import com.example.fintechpagoflex.ui.HomeRoute
 import com.example.fintechpagoflex.ui.HomeScreen
 import com.example.fintechpagoflex.ui.PaymentReceiptRoute
 import com.example.fintechpagoflex.ui.PaymentReceiptScreen
+import com.example.fintechpagoflex.ui.ProfileRoute
+import com.example.fintechpagoflex.ui.ProfileScreen
 import com.example.fintechpagoflex.ui.RecommendRoute
 import com.example.fintechpagoflex.ui.RecommendScreen
 import com.example.fintechpagoflex.ui.ReminderSetupRoute
@@ -103,6 +105,7 @@ class MainActivity : ComponentActivity() {
                                 HomeScreen(
                                     onNavigateToDetail = { id -> topLevelBackStack.add(CommitmentDetailRoute(id)) },
                                     onNavigateToReminders = { topLevelBackStack.add(RemindersRoute) },
+                                    onNavigateToProfile = { topLevelBackStack.add(ProfileRoute) },
                                     onNavigateToReminderSetup = { id -> topLevelBackStack.add(ReminderSetupRoute(id)) }
                                 )
                             }
@@ -113,6 +116,13 @@ class MainActivity : ComponentActivity() {
                             }
                             entry<RecommendRoute> {
                                 RecommendScreen()
+                            }
+                            entry<ProfileRoute> {
+                                ProfileScreen(
+                                    onNavigateBack = {
+                                        if (!topLevelBackStack.removeLast()) finish()
+                                    }
+                                )
                             }
                             entry<CommitmentDetailRoute> { route ->
                                 CommitmentDetailScreen(

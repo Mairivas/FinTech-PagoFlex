@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
     <cache-path name="camera_images" path="images/" />
+    <files-path name="profile_files" path="profile/" />
+    <files-path name="internal_files" path="." />
 </paths>
