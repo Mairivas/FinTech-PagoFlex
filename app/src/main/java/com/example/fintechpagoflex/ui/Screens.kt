@@ -19,8 +19,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import com.example.fintechpagoflex.ui.theme.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -101,7 +103,8 @@ fun HomeScreen(
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
                 ) {
                     Column(
                         modifier = Modifier.padding(16.dp),
@@ -176,15 +179,21 @@ fun HomeScreen(
                                 Surface(
                                     shape = MaterialTheme.shapes.small,
                                     color = when (commitment.status.lowercase()) {
-                                        "pagado" -> MaterialTheme.colorScheme.primaryContainer
-                                        "vencido" -> MaterialTheme.colorScheme.errorContainer
-                                        else -> MaterialTheme.colorScheme.surfaceVariant
+                                        "pagado" -> StatusSuccessContainer
+                                        "vencido" -> StatusWarningContainer
+                                        else -> StatusAmberContainer
+                                    },
+                                    contentColor = when (commitment.status.lowercase()) {
+                                        "pagado" -> StatusOnSuccessContainer
+                                        "vencido" -> StatusOnWarningContainer
+                                        else -> StatusOnAmberContainer
                                     }
                                 ) {
                                     Text(
                                         text = commitment.status,
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                        style = MaterialTheme.typography.labelSmall
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold
                                     )
                                 }
                             }
@@ -477,7 +486,32 @@ fun CommitmentDetailScreen(
                         Text(text = data.company, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                         Text(text = data.concept, style = MaterialTheme.typography.bodyLarge)
                         Text(text = formatCLP(data.amount), style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
-                        Text(text = "Estado: ${data.status}", style = MaterialTheme.typography.bodyMedium)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(text = "Estado:", style = MaterialTheme.typography.bodyMedium)
+                            Surface(
+                                shape = MaterialTheme.shapes.small,
+                                color = when (data.status.lowercase()) {
+                                    "pagado" -> StatusSuccessContainer
+                                    "vencido" -> StatusWarningContainer
+                                    else -> StatusAmberContainer
+                                },
+                                contentColor = when (data.status.lowercase()) {
+                                    "pagado" -> StatusOnSuccessContainer
+                                    "vencido" -> StatusOnWarningContainer
+                                    else -> StatusOnAmberContainer
+                                }
+                            ) {
+                                Text(
+                                    text = data.status,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
                         Text(text = "Vencimiento: ${formatDate(data.dueDate)}", style = MaterialTheme.typography.bodyMedium)
                     }
                 }
@@ -664,6 +698,7 @@ fun PaymentReceiptScreen(
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.errorContainer
                 ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
